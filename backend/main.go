@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -110,7 +111,10 @@ func convertHandler(c *fiber.Ctx) error {
 	grayScaleImg := converter.ConvertToGrayscale(resizedImg)
 	asciiImg := converter.ConvertToASCII(grayScaleImg, palette)
 
-	// Calculate ASCII size (approximate)
+	// Calculate ASCII size in bytes
+	// len() returns byte length, which correctly accounts for:
+	// - ASCII palettes (normal/dense/sparse): 1 byte per character
+	// - Unicode palette: 3 bytes per character (multi-byte UTF-8)
 	asciiSize := len(asciiImg)
 
 	// Return JSON response
@@ -184,8 +188,12 @@ func convertColorHandler(c *fiber.Ctx) error {
 	// Convert to colored ASCII with structured data
 	coloredASCII := converter.ConvertToASCIIWithColorStructured(resizedImg, palette)
 
-	// Calculate ASCII size (approximate - JSON size)
-	asciiSize := len(fmt.Sprintf("%+v", coloredASCII))
+	// Calculate ASCII size by converting to JSON and measuring byte length
+	// This accounts for the actual JSON representation size, which includes:
+	// - Character data (varies by palette: ASCII=1 byte, Unicode=3 bytes per char)
+	// - JSON structure overhead (brackets, commas, quotes, color values)
+	jsonBytes, _ := json.Marshal(coloredASCII)
+	asciiSize := len(jsonBytes)
 
 	// Return JSON response with structured data and size info
 	return c.JSON(fiber.Map{
