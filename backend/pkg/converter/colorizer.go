@@ -25,8 +25,10 @@ func RGBToANSI(r, g, b uint8) string {
 	return ansi
 }
 
-func ConvertToASCIIWithColor(img image.Image) string {
+func ConvertToASCIIWithColor(img image.Image, palette string) string {
 	bounds := img.Bounds()
+	// Convert palette type to actual character palette
+	charPalette := GetPalette(palette)
 	var builder strings.Builder
 
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
@@ -35,7 +37,7 @@ func ConvertToASCIIWithColor(img image.Image) string {
 			r8, g8, b8 := uint8(r>>8), uint8(g>>8), uint8(b>>8)
 
 			brightness := RGBToGrayScale(r, g, b)
-			char := BrightnessToChar(brightness)
+			char := BrightnessToChar(brightness, charPalette)
 
 			// Write colored character
 			builder.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm%s", r8, g8, b8, char))
@@ -49,8 +51,10 @@ func ConvertToASCIIWithColor(img image.Image) string {
 
 // ConvertToASCIIWithColorStructured converts an image to ASCII art with color information
 // Returns structured data suitable for JSON serialization (for API responses)
-func ConvertToASCIIWithColorStructured(img image.Image) ColoredASCII {
+func ConvertToASCIIWithColorStructured(img image.Image, palette string) ColoredASCII {
 	bounds := img.Bounds()
+	// Convert palette type to actual character palette
+	charPalette := GetPalette(palette)
 	lines := make([][]ColoredChar, 0, bounds.Max.Y-bounds.Min.Y)
 
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
@@ -60,7 +64,7 @@ func ConvertToASCIIWithColorStructured(img image.Image) ColoredASCII {
 			r8, g8, b8 := uint8(r>>8), uint8(g>>8), uint8(b>>8)
 
 			brightness := RGBToGrayScale(r, g, b)
-			char := BrightnessToChar(brightness)
+			char := BrightnessToChar(brightness, charPalette)
 
 			line = append(line, ColoredChar{
 				Char: char,

@@ -13,6 +13,18 @@ export interface ColorAsciiData {
 
 export interface GrayscaleAsciiResponse {
   ascii: string;
+  originalSize?: number;
+  originalWidth?: number;
+  originalHeight?: number;
+  asciiSize?: number;
+}
+
+export interface ColorAsciiResponse {
+  lines: ColoredChar[][];
+  originalSize?: number;
+  originalWidth?: number;
+  originalHeight?: number;
+  asciiSize?: number;
 }
 
 export interface ErrorResponse {
@@ -23,16 +35,21 @@ export interface ErrorResponse {
  * Converts an image to grayscale ASCII art
  * @param file The image file to convert
  * @param width Optional width in characters (20-300). If not provided or 0, uses original image size.
+ * @param palette Optional palette type (normal, dense, sparse, unicode). Defaults to normal.
  * @returns Promise resolving to the ASCII string
  */
 export async function convertToAscii(
   file: File,
-  width?: number
+  width?: number,
+  palette?: string
 ): Promise<string> {
   const formData = new FormData();
   formData.append('image', file);
   if (width && width > 0) {
     formData.append('width', width.toString());
+  }
+  if (palette) {
+    formData.append('palette', palette);
   }
 
   const response = await fetch(`${API_BASE_URL}/convert`, {
@@ -46,6 +63,7 @@ export async function convertToAscii(
   }
 
   const data: GrayscaleAsciiResponse = await response.json();
+  // Store size info if available (could be used later)
   return data.ascii;
 }
 
@@ -53,16 +71,21 @@ export async function convertToAscii(
  * Converts an image to colored ASCII art
  * @param file The image file to convert
  * @param width Optional width in characters (20-300). If not provided or 0, uses original image size.
+ * @param palette Optional palette type (normal, dense, sparse, unicode). Defaults to normal.
  * @returns Promise resolving to the structured color ASCII data
  */
 export async function convertToColorAscii(
   file: File,
-  width?: number
+  width?: number,
+  palette?: string
 ): Promise<ColorAsciiData> {
   const formData = new FormData();
   formData.append('image', file);
   if (width && width > 0) {
     formData.append('width', width.toString());
+  }
+  if (palette) {
+    formData.append('palette', palette);
   }
 
   const response = await fetch(`${API_BASE_URL}/convert/color`, {
@@ -75,7 +98,69 @@ export async function convertToColorAscii(
     throw new Error(error.error || `HTTP error! status: ${response.status}`);
   }
 
-  const data: ColorAsciiData = await response.json();
-  return data;
+  const data: ColorAsciiResponse = await response.json();
+  return { lines: data.lines };
+}
+
+/**
+ * Exports ASCII art as SVG
+ * @param file The image file to convert and export
+ * @param width Optional width in characters
+ * @param palette Optional palette type
+ * @param colorMode Whether to use color mode
+ */
+export async function exportToSVG(
+  file: File,
+  width?: number,
+  palette?: string,
+  colorMode?: boolean
+): Promise<void> {
+  const formData = new FormData();
+  formData.append('image', file);
+  if (width && width > 0) {
+    formData.append('width', width.toString());
+  }
+  if (palette) {
+    formData.append('palette', palette);
+  }
+  if (colorMode) {
+    formData.append('color', 'true');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/export/svg`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error: ErrorResponse = await response.json();
+    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+  }
+
+  // Extract filename from Content-Disposition header, or generate from original filename
+  let filename = 'ascii-art.svg';
+  const contentDisposition = response.headers.get('Content-Disposition');
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (filenameMatch && filenameMatch[1]) {
+      filename = filenameMatch[1];
+    }
+  }
+  
+  // Fallback: generate filename from original file if header not available
+  if (filename === 'ascii-art.svg') {
+    const originalName = file.name.replace(/\.[^/.]+$/, '');
+    filename = `${originalName}_svg.svg`;
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 

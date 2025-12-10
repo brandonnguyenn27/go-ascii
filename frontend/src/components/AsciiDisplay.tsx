@@ -6,6 +6,8 @@ interface AsciiDisplayProps {
   isLoading: boolean;
   error: string | null;
   isColorMode: boolean;
+  splitScreen?: boolean;
+  originalImageUrl?: string | null;
 }
 
 export function AsciiDisplay({
@@ -13,6 +15,8 @@ export function AsciiDisplay({
   isLoading,
   error,
   isColorMode,
+  splitScreen = false,
+  originalImageUrl,
 }: AsciiDisplayProps) {
   if (isLoading) {
     return (
@@ -42,10 +46,10 @@ export function AsciiDisplay({
     );
   }
 
-  if (isColorMode && typeof asciiData !== 'string') {
-    // Render colored ASCII
-    return (
-      <Card className="p-4 overflow-auto bg-background">
+  const renderAscii = () => {
+    if (isColorMode && typeof asciiData !== 'string') {
+      // Render colored ASCII
+      return (
         <pre className="text-xs leading-tight font-mono whitespace-pre text-foreground">
           {asciiData.lines.map((line, lineIndex) => (
             <span key={lineIndex}>
@@ -64,17 +68,42 @@ export function AsciiDisplay({
             </span>
           ))}
         </pre>
-      </Card>
-    );
-  }
+      );
+    }
 
-  // Render grayscale ASCII
-  const asciiText = typeof asciiData === 'string' ? asciiData : '';
-  return (
-    <Card className="p-4 overflow-auto bg-background">
+    // Render grayscale ASCII
+    const asciiText = typeof asciiData === 'string' ? asciiData : '';
+    return (
       <pre className="text-xs leading-tight font-mono whitespace-pre text-foreground">
         {asciiText}
       </pre>
+    );
+  };
+
+  if (splitScreen && originalImageUrl) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="p-4">
+          <h4 className="text-sm font-semibold mb-2">Original Image</h4>
+          <div className="flex items-center justify-center bg-muted rounded-md overflow-hidden">
+            <img
+              src={originalImageUrl}
+              alt="Original"
+              className="max-w-full max-h-96 object-contain"
+            />
+          </div>
+        </Card>
+        <Card className="p-4 overflow-auto bg-background">
+          <h4 className="text-sm font-semibold mb-2">ASCII Art</h4>
+          {renderAscii()}
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <Card className="p-4 overflow-auto bg-background">
+      {renderAscii()}
     </Card>
   );
 }
