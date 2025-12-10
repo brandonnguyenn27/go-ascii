@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dracula-inspired dark terminal theme */
+    --background: 231 15% 18%; /* #282a36 - dark purple-gray background */
+    --foreground: 60 30% 96%; /* #f8f8f2 - off-white text */
+    --card: 231 15% 16%; /* Slightly darker for cards */
+    --card-foreground: 60 30% 96%;
+    --popover: 231 15% 16%;
+    --popover-foreground: 60 30% 96%;
+    --primary: 135 94% 65%; /* #50fa7b - green for primary actions */
+    --primary-foreground: 231 15% 18%; /* Dark text on green */
+    --secondary: 231 15% 25%; /* Lighter gray for secondary elements */
+    --secondary-foreground: 60 30% 96%;
+    --muted: 231 15% 22%; /* Muted background */
+    --muted-foreground: 60 30% 70%; /* Muted text */
+    --accent: 265 89% 78%; /* #bd93f9 - purple accent */
+    --accent-foreground: 231 15% 18%;
+    --destructive: 0 100% 67%; /* #ff5555 - red for errors */
+    --destructive-foreground: 60 30% 96%;
+    --border: 231 15% 30%; /* Border color */
+    --input: 231 15% 22%; /* Input background */
+    --ring: 135 94% 65%; /* Focus ring - green */
+    --chart-1: 135 94% 65%;
+    --chart-2: 265 89% 78%;
+    --chart-3: 191 97% 77%; /* #8be9fd - cyan */
+    --chart-4: 31 100% 71%; /* #ffb86c - orange */
+    --chart-5: 326 100% 74%; /* #ff79c6 - pink */
+    --radius: 0.5rem
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

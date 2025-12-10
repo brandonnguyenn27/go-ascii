@@ -1,16 +1,19 @@
 # ASCII Converter
 
-A Go-based ASCII art converter that can convert images to ASCII art. Supports both command-line interface and REST API server modes.
+A Go-based ASCII art converter that can convert images to ASCII art. Supports both command-line interface, REST API server, and a modern web frontend.
 
 ## Features
 
 - Convert images (PNG, JPEG) to ASCII art
 - Support for colored and grayscale ASCII output
-- Adjustable output width
+- Adjustable output width (with optional custom width control)
+- Modern React web frontend with dark terminal theme
 - REST API endpoint for frontend integration
 - Command-line interface for local usage
 
 ## Installation
+
+### Backend
 
 1. Clone the repository
 2. Navigate to the backend directory:
@@ -20,6 +23,17 @@ A Go-based ASCII art converter that can convert images to ASCII art. Supports bo
 3. Install dependencies:
    ```bash
    go mod download
+   ```
+
+### Frontend
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
    ```
 
 ## Usage
@@ -72,6 +86,41 @@ go run main.go --server
 ```
 
 The server will start on `http://localhost:3000`
+
+### Web Frontend
+
+The project includes a modern React frontend with a dark terminal-themed UI.
+
+**Start the frontend:**
+
+1. Make sure the backend server is running (see [Server Mode](#server-mode-rest-api))
+2. In a new terminal, navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+4. Open your browser and navigate to `http://localhost:5173`
+
+**Using the Frontend:**
+
+- **Upload Image**: Click "Choose File" and select a PNG or JPEG image (max 10MB)
+- **Custom Width**: Toggle "Custom Width" to enable width control (default: 100 characters)
+  - Use the slider or input field to set width between 20-300 characters
+- **Color Mode**: Toggle "Color Mode" to enable colored ASCII output
+- **Convert**: Click "Convert to ASCII" to process your image
+- **Copy**: For grayscale mode, use "Copy to Clipboard" to copy the ASCII art
+
+**Build for Production:**
+
+```bash
+cd frontend
+npm run build
+```
+
+The built files will be in the `dist/` directory.
 
 #### API Endpoints
 
@@ -159,44 +208,6 @@ curl -X POST http://localhost:3000/convert/color \
 }
 ```
 
-**Frontend Integration Example (React):**
-
-The `/convert/color` endpoint returns structured data that's easy to render without any ANSI parsing:
-
-```jsx
-function ColoredAsciiDisplay({ coloredData }) {
-  return (
-    <pre style={{ fontFamily: "monospace", fontSize: "8px", lineHeight: "1" }}>
-      {coloredData.lines.map((line, lineIdx) => (
-        <div key={lineIdx}>
-          {line.map((char, charIdx) => (
-            <span
-              key={charIdx}
-              style={{
-                color: `rgb(${char.r}, ${char.g}, ${char.b})`,
-              }}
-            >
-              {char.char}
-            </span>
-          ))}
-        </div>
-      ))}
-    </pre>
-  );
-}
-
-// Usage
-const formData = new FormData();
-formData.append("image", fileInput.files[0]);
-
-const response = await fetch("http://localhost:3000/convert/color", {
-  method: "POST",
-  body: formData,
-});
-const data = await response.json();
-<ColoredAsciiDisplay coloredData={data} />;
-```
-
 ## Project Structure
 
 ```
@@ -212,6 +223,13 @@ ascii-converter/
 │           ├── loader.go     # Image loading utilities
 │           ├── mapper.go     # Brightness to character mapping
 │           └── resizer.go   # Image resizing
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── lib/             # API client and utilities
+│   │   └── App.tsx          # Main app component
+│   ├── package.json
+│   └── vite.config.ts
 ├── images/                   # Sample images
 └── README.md
 ```
@@ -223,5 +241,14 @@ ascii-converter/
 
 ## Dependencies
 
+### Backend
+
 - [Fiber](https://github.com/gofiber/fiber) - Web framework for REST API
 - [nfnt/resize](https://github.com/nfnt/resize) - Image resizing library
+
+### Frontend
+
+- [React](https://react.dev/) - UI framework
+- [Vite](https://vitejs.dev/) - Build tool and dev server
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [shadcn/ui](https://ui.shadcn.com/) - UI component library

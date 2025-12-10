@@ -9,6 +9,7 @@ import (
 
 	"github.com/brandonnguyenn27/ascii-converter/pkg/converter"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
@@ -28,6 +29,13 @@ func main() {
 
 func startServer() {
 	app := fiber.New()
+
+	// Configure CORS middleware
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "http://localhost:5173",
+		AllowMethods: "POST,OPTIONS",
+		AllowHeaders: "Content-Type",
+	}))
 
 	app.Post("/convert", convertHandler)            // Grayscale ASCII (returns string)
 	app.Post("/convert/color", convertColorHandler) // Colored ASCII (returns structured data)
