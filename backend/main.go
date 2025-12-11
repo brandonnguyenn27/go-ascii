@@ -32,7 +32,9 @@ func main() {
 }
 
 func startServer() {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 100 * 1024 * 1024, // 100MB max body size (for video uploads)
+	})
 
 	// Configure CORS middleware
 	app.Use(cors.New(cors.Config{
@@ -43,6 +45,7 @@ func startServer() {
 
 	app.Post("/convert", convertHandler)            // Grayscale ASCII (returns string)
 	app.Post("/convert/color", convertColorHandler) // Colored ASCII (returns structured data)
+	app.Post("/convert/video", convertVideoHandler) // Video to ASCII (returns frames array)
 	app.Post("/export/svg", exportSVGHandler)       // Export ASCII as SVG
 
 	log.Println("Server starting on :3000")
@@ -275,6 +278,116 @@ func exportSVGHandler(c *fiber.Ctx) error {
 	c.Set("Content-Type", "image/svg+xml")
 	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	return c.SendString(svg)
+}
+
+func convertVideoHandler(c *fiber.Ctx) error {
+	// Get the uploaded video file
+	file, err := c.FormFile("video")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Missing or invalid video file. Please upload a video using the 'video' field.",
+		})
+	}
+
+	// Get file size
+	fileSize := file.Size
+
+	// Validate file size (max 50MB)
+	const maxFileSize = 50 * 1024 * 1024 // 50MB
+	if fileSize > maxFileSize {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("Video file too large. Maximum size is %d MB.", maxFileSize/(1024*1024)),
+		})
+	}
+
+	// Get optional width parameter (default: 100)
+	width := 100
+	if widthStr := c.FormValue("width"); widthStr != "" {
+		if parsedWidth, err := strconv.Atoi(widthStr); err == nil && parsedWidth > 0 {
+			width = parsedWidth
+		}
+	}
+
+	// Get optional palette parameter (default: normal)
+	palette := c.FormValue("palette")
+	if palette == "" {
+		palette = converter.PaletteNormal
+	}
+
+	// Get optional fps parameter (default: 10)
+	fps := 10
+	if fpsStr := c.FormValue("fps"); fpsStr != "" {
+		if parsedFps, err := strconv.Atoi(fpsStr); err == nil && parsedFps > 0 && parsedFps <= 15 {
+			fps = parsedFps
+		}
+	}
+
+	// Get optional color mode (default: false)
+	useColor := c.FormValue("color") == "true"
+
+	// Open the uploaded file
+	fileHeader, err := file.Open()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to open uploaded file",
+		})
+	}
+	defer fileHeader.Close()
+
+	// Extract frames from video
+	frames, metadata, err := converter.ExtractFramesFromVideo(fileHeader, fps, int(fileSize))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fmt.Sprintf("Failed to extract frames: %v", err),
+		})
+	}
+
+	// Get first frame dimensions for metadata
+	if len(frames) > 0 {
+		firstFrame := frames[0]
+		bounds := firstFrame.Bounds()
+		metadata.Width = bounds.Max.X - bounds.Min.X
+		metadata.Height = bounds.Max.Y - bounds.Min.Y
+	}
+
+	// Convert frames to ASCII
+	if useColor {
+		// Color mode
+		colorFrames, err := converter.ProcessVideoToColorASCII(frames, width, palette)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("Failed to convert frames: %v", err),
+			})
+		}
+
+		// Update timestamps based on actual FPS
+		for i := range colorFrames {
+			colorFrames[i].Timestamp = float64(i) / float64(fps)
+		}
+
+		return c.JSON(converter.VideoColorAsciiResult{
+			Frames:   colorFrames,
+			Metadata: *metadata,
+		})
+	} else {
+		// Grayscale mode
+		asciiFrames, err := converter.ProcessVideoToASCII(frames, width, palette)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("Failed to convert frames: %v", err),
+			})
+		}
+
+		// Update timestamps based on actual FPS
+		for i := range asciiFrames {
+			asciiFrames[i].Timestamp = float64(i) / float64(fps)
+		}
+
+		return c.JSON(converter.VideoAsciiResult{
+			Frames:   asciiFrames,
+			Metadata: *metadata,
+		})
+	}
 }
 
 // generateExportFilename creates a filename by appending suffix before the extension

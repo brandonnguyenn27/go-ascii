@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { FileUpload } from './components/FileUpload';
+import { VideoUpload } from './components/VideoUpload';
+import { VideoDisplay } from './components/VideoDisplay';
 import { WidthControl } from './components/WidthControl';
 import { ColorToggle } from './components/ColorToggle';
 import { PaletteSelector } from './components/PaletteSelector';
@@ -10,11 +12,17 @@ import { ExportButtons } from './components/ExportButtons';
 import { SizeDisplay } from './components/SizeDisplay';
 import { AsciiDisplay } from './components/AsciiDisplay';
 import { Alert, AlertDescription } from './components/ui/alert';
-import { convertToAscii, convertToColorAscii, type ColorAsciiData } from './lib/api';
+import { convertToAscii, convertToColorAscii, convertVideoToAscii, convertVideoToColorAscii, type ColorAsciiData, type VideoAsciiResponse } from './lib/api';
 import { copyAsciiToClipboard } from './lib/utils';
 import './App.css';
 
+type Mode = 'image' | 'video';
+
 function App() {
+  // Mode state
+  const [mode, setMode] = useState<Mode>('image');
+
+  // Image state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [width, setWidth] = useState(100);
   const [widthEnabled, setWidthEnabled] = useState(false);
@@ -28,6 +36,11 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // Video state
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  const [videoFps, setVideoFps] = useState(10);
+  const [videoResult, setVideoResult] = useState<VideoAsciiResponse | null>(null);
 
   // Clean up object URLs when component unmounts or URL changes
   useEffect(() => {
@@ -106,6 +119,34 @@ function App() {
     }
   };
 
+  const handleVideoConvert = async () => {
+    if (!selectedVideo) {
+      setError('Please select a video file first');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setVideoResult(null);
+
+    try {
+      const widthToUse = widthEnabled && width > 0 ? width : undefined;
+      if (colorMode) {
+        const result = await convertVideoToColorAscii(selectedVideo, widthToUse, palette, videoFps);
+        setVideoResult(result);
+      } else {
+        const result = await convertVideoToAscii(selectedVideo, widthToUse, palette, videoFps);
+        setVideoResult(result);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to convert video';
+      setError(errorMessage);
+      setVideoResult(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -113,14 +154,39 @@ function App() {
           <CardHeader>
             <CardTitle>ASCII Art Converter</CardTitle>
             <CardDescription>
-              Convert your images to ASCII art. Supports both grayscale and color modes.
+              Convert your images and videos to ASCII art. Supports both grayscale and color modes.
             </CardDescription>
+            <div className="flex gap-2 mt-4">
+              <Button
+                variant={mode === 'image' ? 'default' : 'outline'}
+                onClick={() => setMode('image')}
+                size="sm"
+              >
+                Image
+              </Button>
+              <Button
+                variant={mode === 'video' ? 'default' : 'outline'}
+                onClick={() => setMode('video')}
+                size="sm"
+              >
+                Video
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <FileUpload
-              onFileSelect={handleFileSelect}
-              selectedFile={selectedFile}
-            />
+            {mode === 'image' ? (
+              <FileUpload
+                onFileSelect={handleFileSelect}
+                selectedFile={selectedFile}
+              />
+            ) : (
+              <VideoUpload
+                onFileSelect={setSelectedVideo}
+                selectedFile={selectedVideo}
+                fps={videoFps}
+                onFpsChange={setVideoFps}
+              />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <WidthControl
@@ -137,19 +203,21 @@ function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ColorToggle enabled={colorMode} onToggle={setColorMode} />
-              <SplitScreenToggle enabled={splitScreen} onToggle={setSplitScreen} />
+              {mode === 'image' && (
+                <SplitScreenToggle enabled={splitScreen} onToggle={setSplitScreen} />
+              )}
             </div>
 
-            {originalSize && (
+            {mode === 'image' && originalSize && (
               <SizeDisplay originalSize={originalSize} asciiSize={asciiSize} />
             )}
 
             <Button
-              onClick={handleConvert}
-              disabled={!selectedFile || isLoading}
+              onClick={mode === 'image' ? handleConvert : handleVideoConvert}
+              disabled={(mode === 'image' && !selectedFile) || (mode === 'video' && !selectedVideo) || isLoading}
               className="w-full"
             >
-              {isLoading ? 'Converting...' : 'Convert to ASCII'}
+              {isLoading ? 'Converting...' : `Convert ${mode === 'image' ? 'Image' : 'Video'} to ASCII`}
             </Button>
 
             {copySuccess && (
@@ -161,43 +229,68 @@ function App() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Output</h3>
-                <div className="flex gap-2">
-                  {asciiResult && !colorMode && (
-                    <Button
-                      onClick={handleCopy}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Copy to Clipboard
-                    </Button>
-                  )}
-                  {asciiResult && colorMode && (
-                    <Button
-                      disabled
-                      variant="outline"
-                      size="sm"
-                      title="Copy is disabled for color mode (color formatting cannot be preserved in plain text)"
-                    >
-                      Copy to Clipboard
-                    </Button>
-                  )}
-                  <ExportButtons
-                    file={selectedFile}
-                    width={widthEnabled && width > 0 ? width : undefined}
-                    palette={palette}
-                    colorMode={colorMode}
-                    disabled={!asciiResult || isLoading}
-                  />
-                </div>
+                {mode === 'image' && (
+                  <div className="flex gap-2">
+                    {asciiResult && !colorMode && (
+                      <Button
+                        onClick={handleCopy}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Copy to Clipboard
+                      </Button>
+                    )}
+                    {asciiResult && colorMode && (
+                      <Button
+                        disabled
+                        variant="outline"
+                        size="sm"
+                        title="Copy is disabled for color mode (color formatting cannot be preserved in plain text)"
+                      >
+                        Copy to Clipboard
+                      </Button>
+                    )}
+                    <ExportButtons
+                      file={selectedFile}
+                      width={widthEnabled && width > 0 ? width : undefined}
+                      palette={palette}
+                      colorMode={colorMode}
+                      disabled={!asciiResult || isLoading}
+                    />
+                  </div>
+                )}
               </div>
-              <AsciiDisplay
-                asciiData={asciiResult}
-                isLoading={isLoading}
-                error={error}
-                isColorMode={colorMode}
-                splitScreen={splitScreen}
-                originalImageUrl={originalImageUrl}
-              />
+              {mode === 'image' ? (
+                <AsciiDisplay
+                  asciiData={asciiResult}
+                  isLoading={isLoading}
+                  error={error}
+                  isColorMode={colorMode}
+                  splitScreen={splitScreen}
+                  originalImageUrl={originalImageUrl}
+                />
+              ) : (
+                <>
+                  {isLoading && (
+                    <div className="flex items-center justify-center h-64">
+                      <div className="text-muted-foreground">Converting video...</div>
+                    </div>
+                  )}
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  {!isLoading && !error && videoResult && (
+                    <VideoDisplay videoResult={videoResult} isColorMode={colorMode} />
+                  )}
+                  {!isLoading && !error && !videoResult && (
+                    <div className="flex items-center justify-center h-64 text-muted-foreground">
+                      Upload a video and click convert to see the result
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>

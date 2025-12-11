@@ -164,3 +164,106 @@ export async function exportToSVG(
   document.body.removeChild(a);
 }
 
+export interface VideoFrame {
+  index: number;
+  timestamp: number;
+  ascii?: string;
+  lines?: ColoredChar[][];
+}
+
+export interface VideoMetadata {
+  originalSize: number;
+  duration: number;
+  originalFps: number;
+  sampledFps: number;
+  frameCount: number;
+  width: number;
+  height: number;
+}
+
+export interface VideoAsciiResponse {
+  frames: VideoFrame[];
+  metadata: VideoMetadata;
+}
+
+/**
+ * Converts a video to grayscale ASCII art frames
+ * @param file The video file to convert
+ * @param width Optional width in characters (20-300)
+ * @param palette Optional palette type (normal, dense, sparse, unicode)
+ * @param fps Optional target frame rate (10-15 fps)
+ * @returns Promise resolving to video frames and metadata
+ */
+export async function convertVideoToAscii(
+  file: File,
+  width?: number,
+  palette?: string,
+  fps?: number
+): Promise<VideoAsciiResponse> {
+  const formData = new FormData();
+  formData.append('video', file);
+  if (width && width > 0) {
+    formData.append('width', width.toString());
+  }
+  if (palette) {
+    formData.append('palette', palette);
+  }
+  if (fps && fps > 0) {
+    formData.append('fps', fps.toString());
+  }
+
+  const response = await fetch(`${API_BASE_URL}/convert/video`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error: ErrorResponse = await response.json();
+    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+  }
+
+  const data: VideoAsciiResponse = await response.json();
+  return data;
+}
+
+/**
+ * Converts a video to colored ASCII art frames
+ * @param file The video file to convert
+ * @param width Optional width in characters (20-300)
+ * @param palette Optional palette type (normal, dense, sparse, unicode)
+ * @param fps Optional target frame rate (10-15 fps)
+ * @returns Promise resolving to video frames and metadata
+ */
+export async function convertVideoToColorAscii(
+  file: File,
+  width?: number,
+  palette?: string,
+  fps?: number
+): Promise<VideoAsciiResponse> {
+  const formData = new FormData();
+  formData.append('video', file);
+  if (width && width > 0) {
+    formData.append('width', width.toString());
+  }
+  if (palette) {
+    formData.append('palette', palette);
+  }
+  if (fps && fps > 0) {
+    formData.append('fps', fps.toString());
+  }
+  formData.append('color', 'true');
+
+  const response = await fetch(`${API_BASE_URL}/convert/video`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error: ErrorResponse = await response.json();
+    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+  }
+
+  const data: VideoAsciiResponse = await response.json();
+  return data;
+}
+
